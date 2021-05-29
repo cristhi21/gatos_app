@@ -16,7 +16,6 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLDecoder;
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
 import javax.swing.JOptionPane;
@@ -93,7 +92,6 @@ public class GatosService {
                     favoritoGato(gatos);
                     break;
                 default:
-
                     break;
             }
 
@@ -105,11 +103,10 @@ public class GatosService {
 
     public static void favoritoGato(Gatos gato) {
         try {
-
             OkHttpClient client = new OkHttpClient();
             MediaType mediaType = MediaType.parse("application/json");
             //RequestBody body = RequestBody.create(mediaType, "{\r\n  \"image_id\": \"1n7\"\r\n}");
-            RequestBody body = RequestBody.create(mediaType, "{\r\n  \"image_id\": \""+gato.getId()+"\" \r\n}");
+            RequestBody body = RequestBody.create(mediaType, "{\r\n  \"image_id\": \"" + gato.getId() + "\" \r\n}");
             Request request = new Request.Builder()
                     .url("https://api.thecatapi.com/v1/favourites")
                     .method("POST", body)
@@ -122,5 +119,103 @@ public class GatosService {
         }
 
     }
+
+    public static void verFavoritos(String apiKey) {
+        System.out.println("verFavoritos: " + apiKey);
+        try {
+            OkHttpClient client = new OkHttpClient();
+//            Request request = new Request.Builder()
+//                    .url("https://api.thecatapi.com/v1/favourites")
+//                    .method("GET", null)
+//                    .addHeader("x-api-key", apiKey)
+//                    .build();
+            Request request = new Request.Builder().url("https://api.thecatapi.com/v1/favourites").get().addHeader("x-api-key", apiKey).build();
+            Response response = client.newCall(request).execute();
+
+            // guardamos el string con la respuesta
+            String json = response.body().string();
+            
+            //creamos el objeto gson
+            Gson gson = new Gson();
+
+            GatosFav[] gatosArray = gson.fromJson(json, GatosFav[].class);
+
+            if (gatosArray.length > 0) {
+                int min = 1;
+                int max = gatosArray.length;
+                int random = (int) (Math.random() * ((max - min)+1)) + min;
+                int indice = random - 1;
+                GatosFav gatoFav = gatosArray[indice];
+
+                BufferedImage image = null;
+                try {
+                    URL url = new URL(gatoFav.image.getUrl());
+
+                    HttpURLConnection http = (HttpURLConnection) url.openConnection();
+                    http.addRequestProperty("User-Agent", "");
+                    BufferedImage bufferedImage = ImageIO.read(http.getInputStream());
+                    ImageIcon fondoGato = new ImageIcon(bufferedImage);
+
+                    if (fondoGato.getIconWidth() > 800) {
+                        //Redimensional imagen
+                        Image fondo = fondoGato.getImage();
+                        Image modificada = fondo.getScaledInstance(800, 600, java.awt.Image.SCALE_SMOOTH);
+                        fondoGato = new ImageIcon(modificada);
+                    }
+
+                    String menu = "Opciones: "
+                            + "1. Ver otra imagen \n"
+                            + "2. Eliminar favorito \n"
+                            + "3. Volver \n";
+
+                    String[] botones = {"ver otra imagen", "eliminar favorito", "volver"};
+                    String idGato = gatoFav.getId();
+                    System.out.println("idGato: " + idGato);
+                    String opcion = (String) JOptionPane.showInputDialog(null, menu, idGato, JOptionPane.INFORMATION_MESSAGE, fondoGato, botones, botones[0]);
+
+                    int seleccion = -1;
+                    //validamos que opcion selecciona el usuario
+                    for (int i = 0; i < botones.length; i++) {
+                        if (opcion.equals(botones[i])) {
+                            seleccion = i;
+                        }
+                    }
+
+                    System.out.println("seleccion: " + seleccion);
+                    switch (seleccion) {
+                        case 0:
+                            verFavoritos(apiKey);
+                            break;
+                        case 1:
+                            borrarFavorito(gatoFav);
+                            break;
+                        default:
+                            break;
+                    }
+
+                } catch (IOException e) {
+                    System.out.println(e);
+                }
+            }
+        } catch (IOException e) {
+            System.out.println(e);
+        }
+    }
     
+    public static void borrarFavorito(GatosFav gatoFav){
+        try{
+            
+            OkHttpClient client = new OkHttpClient();
+            MediaType mediaType = MediaType.parse("text/plain");
+            RequestBody body = RequestBody.create(mediaType, "");
+            Request request = new Request.Builder()
+                    .url("https://api.thecatapi.com/v1/favourites/"+gatoFav.getId()+"")
+                    .method("DELETE", body)
+                    .addHeader("x-api-key", gatoFav.getApiKey())
+                    .build();
+            Response response = client.newCall(request).execute();
+        } catch(IOException e){
+            System.out.println(e);
+        }
+    }
 }
